@@ -4,6 +4,7 @@ const { google } = require('googleapis');
 const rateLimit = require('express-rate-limit');
 const https = require('https');
 const app = express();
+app.set('trust proxy', 1); // Railway à¹à¸à¹ reverse proxy
 
 // ===== CONFIG (à¹à¸ªà¹à¸à¹à¸²à¸à¸£à¸´à¸à¹à¸ .env) =====
 const config = {
@@ -281,8 +282,13 @@ function requireAdminKey(req, res, next) {
 // ============================================================
 // ===== MIDDLEWARE =====
 // ============================================================
+// LINE webhook à¸à¹à¸­à¸à¹à¸à¹ raw body à¸à¹à¸­à¸ â à¸«à¹à¸²à¸¡à¹à¸«à¹ express.json() à¸­à¹à¸²à¸à¸à¹à¸­à¸
 app.use('/webhook', line.middleware(config));
-app.use(express.json());
+// Routes à¸­à¸·à¹à¸à¹ à¹à¸à¹ json parser (à¸¢à¸à¹à¸§à¹à¸ /webhook)
+app.use((req, res, next) => {
+  if (req.path === '/webhook') return next();
+  express.json()(req, res, next);
+});
 app.use(globalLimiter);
 
 // CORS à¸ªà¸³à¸«à¸£à¸±à¸ LIFF
@@ -751,10 +757,4 @@ async function processOrderAction(orderId, newStatus, adminId) {
 
   const emoji  = newStatus === 'confirmed' ? 'â' : 'â';
   const label  = newStatus === 'confirmed' ? 'à¸¢à¸·à¸à¸¢à¸±à¸à¹à¸¥à¹à¸§' : 'à¸¢à¸à¹à¸¥à¸´à¸à¹à¸¥à¹à¸§';
-  await client.pushMessage(row[2], { type:'text', text:`${emoji} à¹à¸à¸¢ #${orderId} ${label} à¹à¸¥à¹à¸§à¸à¸°à¸à¸°` });
-  await client.pushMessage(adminId, { type:'text', text:`${emoji} ${label} #${orderId} à¹à¸£à¸µà¸¢à¸à¸£à¹à¸­à¸¢à¸à¹à¸°` });
-}
-
-// ===== START =====
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+  await client.pushMessage(row[2],
